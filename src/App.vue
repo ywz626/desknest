@@ -8,8 +8,18 @@ import FolderGroupPanel from "./components/FolderGroupPanel.vue";
 const store = useDesktopStore();
 
 onMounted(async () => {
-  await store.initStore();
-  await store.scanDesktop();
+  // Store 初始化失败不应阻塞桌面扫描
+  try {
+    await store.initStore();
+  } catch (err) {
+    console.error("[App] Store 初始化失败:", err);
+  }
+  // 启动时自动扫描桌面
+  try {
+    await store.scanDesktop();
+  } catch (err) {
+    console.error("[App] 桌面扫描失败:", err);
+  }
 });
 </script>
 

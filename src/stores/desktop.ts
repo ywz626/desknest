@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { markRaw } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { Store } from '@tauri-apps/plugin-store';
 import type { DesktopItem, FolderGroup } from '../types/desktop';
@@ -11,6 +12,7 @@ interface DesktopState {
   isScanning: boolean;
   scanError: string | null;
   selectedItemIds: string[];
+  searchQuery: string;
   store: Store | null;
 }
 
@@ -25,6 +27,7 @@ export const useDesktopStore = defineStore('desktop', {
     isScanning: false,
     scanError: null,
     selectedItemIds: [],
+    searchQuery: '',
     store: null,
   }),
 
@@ -39,35 +42,64 @@ export const useDesktopStore = defineStore('desktop', {
     searchItems:
       (state) =>
       (query: string): DesktopItem[] => {
-        if (!query.trim()) return state.items;
-        const lower = query.toLowerCase();
+        const lower = query.trim().toLowerCase();
+        if (!lower) return state.items;
         return state.items.filter((item) =>
           item.name.toLowerCase().includes(lower)
         );
       },
+
+    /** 搜索后的未分组桌面项目 */
+    filteredUngroupedItems: (state): DesktopItem[] => {
+      const groupedIds = new Set(state.groups.flatMap((g) => g.itemIds));
+      const lower = state.searchQuery.trim().toLowerCase();
+      return state.items.filter((item) => {
+        if (groupedIds.has(item.id)) return false;
+        if (!lower) return true;
+        return item.name.toLowerCase().includes(lower);
+      });
+    },
   },
 
   actions: {
     /** 初始化 Tauri Store */
     async initStore() {
-      this.store = await Store.load(STORE_PATH);
-      await this.loadPersistedData();
+      try {
+        // markRaw 防止 Vue 的 reactive() 递归代理 Store 实例，破坏内部方法
+        this.store = markRaw(await Store.load(STORE_PATH));
+        console.log('[DesktopStore] Store 加载成功:', STORE_PATH);
+        await this.loadPersistedData();
+      } catch (err) {
+        console.error('[DesktopStore] Store 初始化失败:', err);
+        this.store = null;
+      }
     },
 
     /** 从持久化存储加载分组数据 */
     async loadPersistedData() {
       if (!this.store) return;
-      const groups = await this.store.get<FolderGroup[]>('groups');
-      if (groups) {
-        this.groups = groups;
+      try {
+        const groups = await this.store.get<FolderGroup[]>('groups');
+        if (groups) {
+          this.groups = groups;
+          console.log('[DesktopStore] 加载分组:', groups.length, '个');
+        }
+      } catch (err) {
+        console.error('[DesktopStore] 加载分组失败:', err);
       }
     },
 
     /** 保存分组数据到持久化存储 */
     async saveGroups() {
-      if (!this.store) return;
-      await this.store.set('groups', this.groups);
+      if (!this.store) {
+        console.warn('[DesktopStore] 保存失败: store 未初始化');
+        return;
+      }
+      // 深拷贝为纯 JSON，避免 Vue 响应式代理导致序列化异常
+      const rawGroups = JSON.parse(JSON.stringify(this.groups)) as FolderGroup[];
+      await this.store.set('groups', rawGroups);
       await this.store.save();
+      console.log('[DesktopStore] 分组已保存:', rawGroups.length, '个');
     },
 
     /** 扫描桌面 */
@@ -134,6 +166,11 @@ export const useDesktopStore = defineStore('desktop', {
         group.name = newName;
         await this.saveGroups();
       }
+    },
+
+    /** 更新搜索关键词 */
+    setSearchQuery(query: string) {
+      this.searchQuery = query;
     },
 
     /** 选择/取消选择项目 */

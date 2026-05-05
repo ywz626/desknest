@@ -30,15 +30,12 @@ pub fn scan_desktop() -> Result<Vec<DesktopItem>, String> {
 }
 
 /// 获取桌面路径
-/// 反直觉说明：使用 %USERPROFILE%\Desktop 而非 SHGetKnownFolderPath，
-/// 因为 Tauri v2 在 Windows 上通过 env 获取更稳定，且本项目 Phase 1 只支持标准配置。
-/// 后续企业环境（OneDrive 重定向）再迁移到 SHGetKnownFolderPath。
+/// 使用 dirs crate 跨平台获取，能正确处理 OneDrive 重定向等场景。
 fn get_desktop_path() -> Result<String, String> {
-    let home = std::env::var("USERPROFILE")
-        .or_else(|_| std::env::var("HOME"))
-        .map_err(|_| "无法获取用户主目录".to_string())?;
-    let desktop = Path::new(&home).join("Desktop");
-    Ok(desktop.to_string_lossy().to_string())
+    match dirs::desktop_dir() {
+        Some(path) => Ok(path.to_string_lossy().to_string()),
+        None => Err("无法获取桌面目录".to_string()),
+    }
 }
 
 /// 将单个路径转换为 DesktopItem

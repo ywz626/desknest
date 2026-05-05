@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import { useDesktopStore } from "../stores/desktop";
+import DesktopItemIcon from "./DesktopItemIcon.vue";
 
 const store = useDesktopStore();
 const expandedGroups = ref<Set<string>>(new Set());
+
+const itemsById = computed(() => new Map(store.items.map((item) => [item.id, item])));
 
 function toggleGroup(groupId: string) {
   if (expandedGroups.value.has(groupId)) {
@@ -31,7 +35,17 @@ async function handleRemoveItem(groupId: string, itemId: string) {
 }
 
 function getItemById(id: string) {
-  return store.items.find((item) => item.id === id);
+  return itemsById.value.get(id);
+}
+
+async function handleOpenItem(itemId: string) {
+  const item = itemsById.value.get(itemId);
+  if (!item) return;
+  try {
+    await invoke("open_item", { path: item.path });
+  } catch (err) {
+    console.error("无法打开文件:", item.path, err);
+  }
 }
 </script>
 
@@ -62,8 +76,14 @@ function getItemById(id: string) {
             v-for="itemId in group.itemIds"
             :key="itemId"
             class="group-item"
+            @dblclick="handleOpenItem(itemId)"
           >
-            <span class="item-icon">📄</span>
+            <DesktopItemIcon
+              v-if="getItemById(itemId)"
+              :item="getItemById(itemId)!"
+              variant="compact"
+            />
+            <span v-else class="missing-item-icon">?</span>
             <span class="item-name">{{ getItemById(itemId)?.name || "未知文件" }}</span>
             <button class="item-remove" @click.stop="handleRemoveItem(group.id, itemId)">×</button>
           </div>
@@ -188,9 +208,17 @@ function getItemById(id: string) {
   background: rgba(255, 255, 255, 0.06);
 }
 
-.item-icon {
-  font-size: 14px;
-  opacity: 0.7;
+.missing-item-icon {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 12px;
 }
 
 .item-name {

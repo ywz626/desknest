@@ -1,10 +1,23 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useDesktopStore } from "../stores/desktop";
 
 const store = useDesktopStore();
-const searchQuery = ref("");
 const isRefreshing = ref(false);
+
+const appWindow = getCurrentWebviewWindow();
+
+function startDrag(e: MouseEvent) {
+  // 只有左键才触发窗口拖动
+  if (e.button !== 0) return;
+  // 如果点击的是交互元素（按钮、输入框），不触发拖动
+  const target = e.target as HTMLElement;
+  if (target.closest("button, input, .search-box")) {
+    return;
+  }
+  appWindow.startDragging();
+}
 
 async function handleRefresh() {
   if (isRefreshing.value) return;
@@ -19,12 +32,29 @@ async function handleCreateGroup() {
     await store.createGroup(name.trim());
   }
 }
+
+async function handleMinimize() {
+  await appWindow.minimize();
+}
+
+async function handleMaximize() {
+  const isMax = await appWindow.isMaximized();
+  if (isMax) {
+    await appWindow.unmaximize();
+  } else {
+    await appWindow.maximize();
+  }
+}
+
+async function handleClose() {
+  await appWindow.close();
+}
 </script>
 
 <template>
   <div class="shell">
-    <!-- 标题栏 -->
-    <header class="titlebar" data-tauri-drag-region>
+    <!-- 标题栏：手动实现拖动，避免 data-tauri-drag-region 拦截所有鼠标事件 -->
+    <header class="titlebar" @mousedown="startDrag">
       <div class="titlebar-left">
         <span class="app-icon">🪹</span>
         <span class="app-name">DeskNest</span>
@@ -34,10 +64,9 @@ async function handleCreateGroup() {
         <div class="search-box">
           <span class="search-icon">🔍</span>
           <input
-            v-model="searchQuery"
+            v-model="store.searchQuery"
             type="text"
             placeholder="搜索桌面项目..."
-            @input="store.searchItems(searchQuery)"
           />
         </div>
       </div>
@@ -48,12 +77,20 @@ async function handleCreateGroup() {
           :class="{ spinning: isRefreshing }"
           title="刷新"
           @click="handleRefresh"
+          @mousedown.stop
         >
           🔄
         </button>
-        <button class="toolbar-btn primary" title="新建收纳盒" @click="handleCreateGroup">
+        <button class="toolbar-btn primary" title="新建收纳盒" @click="handleCreateGroup" @mousedown.stop>
           + 新建收纳盒
         </button>
+
+        <!-- 窗口控制按钮 -->
+        <div class="window-controls">
+          <button class="win-btn minimize" title="最小化" @click="handleMinimize" @mousedown.stop>−</button>
+          <button class="win-btn maximize" title="最大化" @click="handleMaximize" @mousedown.stop>□</button>
+          <button class="win-btn close" title="关闭" @click="handleClose" @mousedown.stop>×</button>
+        </div>
       </div>
     </header>
 
@@ -84,8 +121,6 @@ async function handleCreateGroup() {
   background: rgba(40, 40, 40, 0.9);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  -webkit-app-region: drag;
-  app-region: drag;
 }
 
 .titlebar-left,
@@ -93,16 +128,12 @@ async function handleCreateGroup() {
   display: flex;
   align-items: center;
   gap: 10px;
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
 }
 
 .titlebar-center {
   flex: 1;
   display: flex;
   justify-content: center;
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
 }
 
 .app-icon {
@@ -164,8 +195,6 @@ async function handleCreateGroup() {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
 }
 
 .toolbar-btn:hover {
@@ -192,6 +221,50 @@ async function handleCreateGroup() {
   to {
     transform: rotate(360deg);
   }
+}
+
+.window-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+  padding-left: 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.win-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.win-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.win-btn.minimize:hover {
+  background: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+}
+
+.win-btn.maximize:hover {
+  background: rgba(76, 175, 80, 0.2);
+  color: #81c784;
+}
+
+.win-btn.close:hover {
+  background: rgba(239, 83, 80, 0.2);
+  color: #ef5350;
 }
 
 .shell-body {

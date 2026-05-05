@@ -6,7 +6,7 @@ import type { DesktopItem } from "../types/desktop";
 
 const store = useDesktopStore();
 
-const displayItems = computed(() => store.ungroupedItems);
+const displayItems = computed(() => store.filteredUngroupedItems);
 
 function handleSelect(id: string) {
   store.toggleSelection(id);

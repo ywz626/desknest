@@ -28,3 +28,9 @@ PLAN.md
 *.sln
 *.sw?
 /.vscode/
+
+# Local test scripts & artifacts
+capture.ps1
+verify_ui.ps1
+verify_search.png
+screenshot.png
