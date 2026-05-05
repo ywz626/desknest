@@ -2,9 +2,11 @@
 import { ref } from "vue";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useDesktopStore } from "../stores/desktop";
+import SettingsModal from "./SettingsModal.vue";
 
 const store = useDesktopStore();
 const isRefreshing = ref(false);
+const showSettings = ref(false);
 
 const appWindow = getCurrentWebviewWindow();
 
@@ -84,6 +86,9 @@ async function handleClose() {
         <button class="toolbar-btn primary" title="新建收纳盒" @click="handleCreateGroup" @mousedown.stop>
           + 新建收纳盒
         </button>
+        <button class="toolbar-btn" title="设置" @click="showSettings = true" @mousedown.stop>
+          ⚙️
+        </button>
 
         <!-- 窗口控制按钮 -->
         <div class="window-controls">
@@ -98,6 +103,8 @@ async function handleClose() {
     <div class="shell-body">
       <slot />
     </div>
+
+    <SettingsModal v-model:show="showSettings" />
   </div>
 </template>
 

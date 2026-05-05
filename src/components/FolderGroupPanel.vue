@@ -47,6 +47,24 @@ async function handleOpenItem(itemId: string) {
     console.error("无法打开文件:", item.path, err);
   }
 }
+
+async function handleDeleteGroup(groupId: string) {
+  const group = store.groups.find((g) => g.id === groupId);
+  if (!group) return;
+  const confirmed = confirm(`确定要删除收纳盒「${group.name}」吗？盒内项目会回到桌面网格。`);
+  if (confirmed) {
+    await store.deleteGroup(groupId);
+  }
+}
+
+async function handleRenameGroup(groupId: string) {
+  const group = store.groups.find((g) => g.id === groupId);
+  if (!group) return;
+  const newName = prompt("请输入新名称：", group.name);
+  if (newName?.trim()) {
+    await store.renameGroup(groupId, newName.trim());
+  }
+}
 </script>
 
 <template>
@@ -69,6 +87,23 @@ async function handleOpenItem(itemId: string) {
           <span class="group-toggle">{{ expandedGroups.has(group.id) ? "▼" : "▶" }}</span>
           <span class="group-name">{{ group.name }}</span>
           <span class="group-badge">{{ group.itemIds.length }}</span>
+
+          <div class="group-actions" @click.stop>
+            <button
+              class="action-btn"
+              title="重命名"
+              @click="handleRenameGroup(group.id)"
+            >
+              ✏️
+            </button>
+            <button
+              class="action-btn delete"
+              title="删除"
+              @click="handleDeleteGroup(group.id)"
+            >
+              🗑️
+            </button>
+          </div>
         </div>
 
         <div v-if="expandedGroups.has(group.id)" class="group-items">
@@ -184,6 +219,42 @@ async function handleOpenItem(itemId: string) {
   background: rgba(255, 255, 255, 0.08);
   padding: 2px 7px;
   border-radius: 8px;
+}
+
+/* Group action buttons */
+.group-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.group-header:hover .group-actions {
+  opacity: 1;
+}
+
+.action-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+}
+
+.action-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.action-btn.delete:hover {
+  background: rgba(239, 83, 80, 0.2);
 }
 
 .group-items {
